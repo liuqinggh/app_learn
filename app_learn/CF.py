@@ -7,32 +7,35 @@ Created on Wed Jun 01 23:59:40 2016
 import MySQLdb
 import numpy as np
 
+pth_glb = os.getcwd() + '\\' + 'result_global.txt'
+pth_lcl = os.getcwd() + '\\' + 'result_local.txt'
+pth_sim = os.getcwd() + '\\' + "simMatrix.txt"
+pth_day = os.getcwd() + '\\' + "sku_count_by_day.txt"
+pth_hour = os.getcwd() + '\\' + "sku_count_by_hour.txt"
+
 class CF:
     SKU_NUM = 413
     lambdah= 5
     userIdx = {}
     skuIdx = {}
-    pth_sim = r"C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\simmatrix_raw.txt"
-    pth_day = r"C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\sku_day.txt"
-    pth_hour = r"C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\sku_hour.txt"
     simMatrix = np.zeros((413, 413))
     sku_day = np.zeros((413, 28))
     sku_hour = np.zeros((413, 24))
     
     def LoadInfos(self):
-        tmp = open(self.pth_sim).readlines()
+        tmp = open(pth_sim).readlines()
         for i in range(413):
-            line = tmp[i].strip('\r\n').split(' ')
+            line = tmp[i].strip('\r\n').split(',')
             for j in range(413):
                 self.simMatrix[i, j] = line[j]
-        tmp = open(self.pth_day).readlines()    
+        tmp = open(pth_day).readlines()    
         for i in range(413):
-            line = tmp[i].strip('\r\n').split(' ')
+            line = tmp[i].strip('\r\n').split(',')
             for j in range(28):
                 self.sku_day[i, j] = line[j]
-        tmp = open(self.pth_hour).readlines() 
+        tmp = open(pth_hour).readlines() 
         for i in range(413):
-            line = tmp[i].strip('\r\n').split(' ')
+            line = tmp[i].strip('\r\n').split(',')
             for j in range(24):
                 self.sku_hour[i, j] = line[j]
         print 'Load finished！'

@@ -5,90 +5,74 @@ Created on Fri Jun 10 10:45:53 2016
 @author: qing.liu
 """
 
+# 处理基本数据
+
 import pandas as pd
 import numpy as np
 from datetime import *
-import math
+import scipy.spatial.distance as dist
+import os
 
-pth = r'C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\clickinfo.txt'
-pth_user = r'C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\userid.txt'
-pth_sku = r'C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\temp_files\skuid.txt'
-pth_raw = r'C:\Users\qing.liu\Desktop\baidu_movie\lecast\first\lecastwork\fudan\raw_data.csv'
+pth_raw = os.getcwd() + '\\'
 #df = pd.read_csv(pth, sep = ' ')
 
+# 读取源数据
+df = pd.read_csv(pth_raw + 'raw_data.csv', sep = ',')
 
-df = pd.read_csv(pth_raw, sep = ',')
+click_num = df.shape[0]                    # 记录数
+user_num = len(df['user'].unique())        # 用户数
+sku_num = len(df['sku'].unique())          # 产品数
 
-click_num = df.shape[0]
-user_num = len(df['user'].unique())
-sku_num = len(df['sku'].unique())
+basetick = datetime(2011, 8, 11)           #基准时间
+simMatrix = np.zeros((sku_num, sku_num))   #相似度矩阵
 
-click_matrix = np.zeros((sku_num, user_num))
-basetick = datetime(2011, 8, 11)
-users = np.empty(click_num)  #np.zeros((click_num, 1))
-skus = np.empty(click_num)   #np.zeros((click_num, 1))
-ticks = np.empty(click_num)  #np.zeros((click_num, 1))
-#txt = open(pth).readlines()
+# 处理字段
+def to_dicts(df, nm):
+    users = df[nm].unique()
+    dff = pd.Series(users, name = nm).reset_index()   #.set_index(nm)
+    dff.columns = [nm+'_id', nm]
+    return dff
 
-for i in range(click_num):
-    m = txt[i].strip('\n').split(' ')
-    skus[i] = m[1]
-    users[i] = m[0]
-    date = m[2]
-    time = m[3]
-    click_matrix[int(skus[i])-1, int(users[i]) -1] = 1
-    ticks[i] = (datetime.strptime(str(m[2]+' '+m[3]), '%Y/%m/%d %H:%M:%S') - basetick).days
+users = to_dicts(df, 'user')     # 用户标记
+users.to_csv(pth_raw  + 'user_name.txt', index = False, float_format = '%s' )
 
-#  user名称
-txt = open(pth_user).readlines()
-user_names = dict()
-for i in range(user_num):
-    m = txt[i].strip('\n').split(' ')
-    user_names[i] = m[1]
-pd.Series(user_names).to_csv(r'D:\py\app_learn\user_names.txt', sep = '\t')
+skus = to_dicts(df, 'sku')       # 产品标记
+skus.to_csv(pth_raw  + 'sku_name.txt', index = False, float_format = '%d')
 
-#  sku名称
-txt = open(pth_sku).readlines()
-sku_names = dict()
-for i in range(sku_num):
-    m = txt[i].strip('\n').split(' ')
-    sku_names[i] = m[1]
-pd.Series(sku_names).to_csv(r'D:\py\app_learn\sku_names.txt', sep = '\t')
+# 获取日期，时间
+df['click_dt'] = df['click_time'].apply(lambda x : (datetime.strptime(x, '%Y-%m-%d %H:%M:%S')- basetick).days/3 )
+df['click_tm'] = df['click_time'].apply(lambda x : datetime.strftime(datetime.strptime(x, '%Y-%m-%d %H:%M:%S'), '%H'))
 
-# 每个sku在每天的占比
-sku_count_by_day = np.zeros((sku_num, 28))
+dd = pd.merge(df, users, on='user')
+result = pd.merge(dd, skus, on='sku')
 
-ilist = [ i for i in range(0,85) if i%3 == 0]
-llist = [ i for i in range(len(ilist) -1) ]
+click_info = result[['user_id', 'sku_id', 'click_dt', 'click_tm']]
+click_info.to_csv(pth_raw  + 'click_info.txt', index = False)
 
-cats = pd.cut(ticks, ilist, labels=llist)
-ss = pd.Series(cats).value_counts().sort_index()
-sss = ss/len(ticks)
-sss.to_csv(r'D:\py\app_learn\sku_count_by_day.txt', sep = '\t')
+#  产品相似度矩阵
+click = click_info.pivot_table(values ='click_dt', index= 'sku_id', columns='user_id', aggfunc = 'count')
 
+# 将列内容替换成列名
+for i in range(len(click.columns)):
+    c = click.iloc[:,i]
+    c[c> 0] = click.columns[i]
+
+click_matrix = click.as_matrix()
+
+for i in range(sku_num):                 #产品相似度
+    for j in range(sku_num):
+        simMatrix[i, j] = 1- dist.pdist([click_matrix[i, :] , click_matrix[j, :]], metric ='jaccard')  
+np.savetxt(pth_raw  + 'simMatrix.txt', simMatrix, delimiter=',', fmt = '%2f')
+
+# 每个sku在每天占比
+sku_dt = click_info.pivot_table(values ='user_id', index= 'sku_id', columns='click_dt', aggfunc = 'count').fillna(0)
+sku_per_dt = sku_dt.div(sku_dt.sum(axis = 1), axis = 0)
+sku_per_dt.to_csv(pth_raw  + 'sku_count_by_day.txt', index = False, float_format = '%s' )
 
 # 每个sku在每个时刻占比
-sku_count_by_hour = np.zeros((sku_num, 24))
-
-tlist = [ i for i in range(25)]
-tmlist = [ i for i in range(len(tlist) -1) ]
-
-cats = pd.cut(ticks, tlist, labels=tmlist)
-skh = pd.Series(cats).value_counts().sort_index()
-skhh = skh/len(ticks)
-skhh.to_csv(r'D:\py\app_learn\sku_count_by_hour.txt', sep = '\t')
-
-# getsimMatrix
-
-import scipy.spatial.distance as dist
-
-simMatrix = np.zeros((sku_num, sku_num))
-
-for i in range(sku_num):
-    for j in range(sku_num):
-        simMatrix[i, j] = dist.pdist([click_matrix[i, :] , click_matrix[j, :]],'jaccard')  
-
-np.savetxt(r'D:\py\app_learn\simMatrix.txt', simMatrix, delimiter='\t')
+sku_tm = click_info.pivot_table(values ='user_id', index= 'sku_id', columns='click_tm', aggfunc = 'count').fillna(0)
+sku_per_tm = sku_tm.div(sku_tm.sum(axis = 1), axis = 0)
+sku_per_tm.to_csv(pth_raw  + 'sku_count_by_hour.txt', index = False, float_format = '%s')
 
 
 

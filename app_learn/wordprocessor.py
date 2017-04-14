@@ -8,8 +8,8 @@ Created on Tue Jun 21 22:59:40 2016
 pth_glb = r'D:\py\app_learn\result_global.txt'
 pth_lcl = r'D:\py\app_learn\result_local.txt'
 
-pth_glb_txt = r'D:\py\app_learn\result_global_tt.txt'
-pth_lcl_txt = r'D:\py\app_learn\result_local_tt.txt'
+pth_glb_txt = r'D:\py\app_learn\result_global.txt'
+pth_lcl_txt = r'D:\py\app_learn\result_local.txt'
 
 import math
 
